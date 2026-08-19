@@ -9,18 +9,25 @@ sudo apt-get update
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get install -y \
     curl git unzip wget btop build-essential \
-    libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
-    libsqlite3-dev libncursesw5-dev xz-utils tk-dev \
-    libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev \
-    zsh lsd bat fzf zoxide fd-find dbus-user-session gnupg software-properties-common
+    zsh lsd bat fzf zoxide fd-find \
+    dbus-user-session gnupg software-properties-common
 
-# 2. Enable Systemd in WSL (Required for Docker)
+# 2. Install GitHub CLI (Official Repo for latest version)
+echo "🐙 Installing GitHub CLI..."
+if ! command -v gh &> /dev/null; then
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    sudo apt-get update && sudo apt-get install gh -y
+fi
+
+# 3. Enable Systemd in WSL (Required for Docker)
 echo "⚙️ Enabling Systemd..."
 if ! grep -q "systemd=true" /etc/wsl.conf 2>/dev/null; then
     echo -e "[boot]\nsystemd=true" | sudo tee -a /etc/wsl.conf
 fi
 
-# 3. Install Docker & Docker Compose
+# 4. Install Docker & Docker Compose
 echo "🐳 Installing Docker Engine..."
 if ! command -v docker &> /dev/null; then
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -29,7 +36,7 @@ if ! command -v docker &> /dev/null; then
     sudo usermod -aG docker $USER
 fi
 
-# 4. Install AWS CLI v2
+# 5. Install AWS CLI v2
 echo "☁️ Installing AWS CLI..."
 if ! command -v aws &> /dev/null; then
     curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -38,7 +45,7 @@ if ! command -v aws &> /dev/null; then
     rm -rf awscliv2.zip aws
 fi
 
-# 5. Install Terraform (Official HashiCorp Repo)
+# 6. Install Terraform (Official HashiCorp Repo)
 echo "🏗️ Installing Terraform..."
 if ! command -v terraform &> /dev/null; then
     wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -46,7 +53,7 @@ if ! command -v terraform &> /dev/null; then
     sudo apt-get update && sudo apt-get install -y terraform
 fi
 
-# 6. Install Lazygit and Lazydocker
+# 7. Install Lazygit and Lazydocker
 echo "🖥️ Installing TUIs (Lazygit & Lazydocker)..."
 # Lazygit
 LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
@@ -57,7 +64,7 @@ rm lazygit.tar.gz lazygit
 # Lazydocker
 curl -s https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
 
-# 7. Install Development Toolchains (uv, nvm, pnpm)
+# 8. Install Development Toolchains (uv, nvm, pnpm)
 echo "🐍 Installing Python (uv) & Node.js (nvm/pnpm)..."
 # uv
 if ! command -v uv &> /dev/null; then
@@ -74,7 +81,27 @@ if [ ! -d "$HOME/.nvm" ]; then
     corepack enable pnpm
 fi
 
-# 8. Zsh, Oh My Zsh, and UI Configuration
+# 9. SSH Key Generation & GitHub Upload
+if [[ -z "${SSH_EMAIL:-}" || -z "${GH_TOKEN:-}" ]]; then
+    echo "⚠️  SSH_EMAIL or GH_TOKEN not provided. Skipping SSH key generation and GitHub upload."
+else
+    echo "🔑 Generating and uploading SSH Key..."
+   
+    # Generate Key
+    if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+        ssh-keygen -t ed25519 -C "$SSH_EMAIL" -f "$HOME/.ssh/id_ed25519" -N ""
+        eval "$(ssh-agent -s)"
+        ssh-add "$HOME/.ssh/id_ed25519"
+    fi
+
+    # Upload to GitHub
+    echo "🚀 Uploading SSH key to GitHub..."
+    echo "$GH_TOKEN" | gh auth login --with-token
+    gh ssh-key add "$HOME/.ssh/id_ed25519.pub" --title "WSL Auto-Setup $(date +'%Y-%m-%d')"
+    echo "✅ SSH Key successfully added to GitHub!"
+fi
+
+# 10. Zsh, Oh My Zsh, and UI Configuration
 echo "🐚 Setting up Zsh environment..."
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
     RUNZSH=no CHSH=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
@@ -98,7 +125,7 @@ fi
 
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf)
+plugins=(git ssh-agent zsh-autosuggestions zsh-syntax-highlighting fzf)
 source $ZSH/oh-my-zsh.sh
 
 # Load Powerlevel10k config
