@@ -82,23 +82,30 @@ if [ ! -d "$HOME/.nvm" ]; then
 fi
 
 # 9. SSH Key Generation & GitHub Upload
-if [[ -z "${SSH_EMAIL:-}" || -z "${GH_TOKEN:-}" ]]; then
-    echo "⚠️  SSH_EMAIL or GH_TOKEN not provided. Skipping SSH key generation and GitHub upload."
+if [[ -z "${SSH_EMAIL:-}" || -z "${SETUP_GH_TOKEN:-}" ]]; then
+    echo "⚠️  SSH_EMAIL or SETUP_GH_TOKEN not provided. Skipping SSH automation."
 else
-    echo "🔑 Generating and uploading SSH Key..."
+    echo "🔑 Generating SSH Key..."
    
     # Generate Key
     if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-        ssh-keygen -t ed25519 -C "$SSH_EMAIL" -f "$HOME/.ssh/id_ed25519" -N ""
-        eval "$(ssh-agent -s)"
-        ssh-add "$HOME/.ssh/id_ed25519"
+        # || true prevents script exit if generation fails for some edge-case reason
+        ssh-keygen -t ed25519 -C "$SSH_EMAIL" -f "$HOME/.ssh/id_ed25519" -N "" || true
+        eval "$(ssh-agent -s)" || true
+        ssh-add "$HOME/.ssh/id_ed25519" || true
     fi
 
-    # Upload to GitHub
+    # Upload to GitHub gracefully (Catches errors so the script doesn't die)
     echo "🚀 Uploading SSH key to GitHub..."
-    echo "$GH_TOKEN" | gh auth login --with-token
-    gh ssh-key add "$HOME/.ssh/id_ed25519.pub" --title "WSL Auto-Setup $(date +'%Y-%m-%d')"
-    echo "✅ SSH Key successfully added to GitHub!"
+    if echo "$SETUP_GH_TOKEN" | gh auth login --with-token; then
+        if gh ssh-key add "$HOME/.ssh/id_ed25519.pub" --title "WSL Auto-Setup $(date +'%Y-%m-%d')"; then
+            echo "✅ SSH Key successfully added to GitHub!"
+        else
+            echo "❌ Failed to upload SSH key to GitHub. Continuing setup..."
+        fi
+    else
+        echo "❌ GitHub CLI authentication failed. Continuing setup..."
+    fi
 fi
 
 # 10. Zsh, Oh My Zsh, and UI Configuration
