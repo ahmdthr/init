@@ -166,6 +166,16 @@ alias lt='ls --tree'
 alias cat='batcat'
 alias fd='fdfind'
 
+# Additional Git convenience aliases
+alias gac='git add -A; git commit -m'
+
+# Docker convenience aliases
+alias dcu='docker compose up -d'
+alias dps='docker ps -a'
+alias drm='docker rm -f $(docker ps -aq)'
+alias drmi='docker rmi -f $(docker images -q)'
+alias drmv='docker volume rm $(docker volume ls -q)'
+
 # Custom Functions
 # Create Project and Activate (cpa)
 cpa() {
@@ -193,10 +203,10 @@ cpa() {
     echo "✅ Project $1 is ready!"
 }
 
-cra() {
+cvra() {
     if [ "$#" -ne 1 ]; then
-        echo "Usage: cpr <project_name>"
-        echo "Example: cpr my_react_app"
+        echo "Usage: cvra <project_name>"
+        echo "Example: cvra my_react_app"
         return 1
     fi
    
